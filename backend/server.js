@@ -15,11 +15,23 @@ connectDB();
 
 const app = express();
 
+// CORS configuration
+app.use(cors({
+  origin: [
+    'https://stocksphere-backend-y74h.onrender.com',
+    'http://localhost:3000',  // For local development
+    'http://localhost:5000'   // For local development
+  ],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+  optionsSuccessStatus: 200
+}));
+
 // Logging based on environment
 app.use(morgan(process.env.NODE_ENV === "development" ? "dev" : "combined"));
 
 // Middlewares
-app.use(cors());
 app.use(express.json());
 
 // Health check
