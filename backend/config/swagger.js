@@ -7,11 +7,11 @@ const options = {
     info: {
       title: "Stocksphere API",
       version: "1.0.0",
-      description: "API documentation for Stocksphere System",
+      description: "API documentation for the Stocksphere backend system",
     },
     servers: [
       {
-        url: "http://localhost:5000", // ✅ This is your API base, NOT /api-docs
+        url: process.env.BASE_URL || "https://your-app-name.onrender.com", // ✅ Set in .env or fallback to production URL
       },
     ],
     components: {
@@ -23,13 +23,17 @@ const options = {
         },
       },
     },
+    security: [
+      {
+        bearerAuth: [],
+      },
+    ],
   },
-  apis: ["./routes/*.js"], // ✅ Make sure your JSDoc comments exist in these route files
+  apis: ["./routes/*.js"], // ✅ Adjust if your route files are in a different path
 };
 
 const swaggerSpec = swaggerJSDoc(options);
 
-// ✅ Export both to use in app.js
 module.exports = {
   swaggerUi,
   swaggerSpec,
