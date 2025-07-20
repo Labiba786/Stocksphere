@@ -10,19 +10,12 @@ const currencySymbols = {
   GBP: "£",
 };
 
-// IPv4 agent to avoid IPv6 timeout issues
-const ipv4Agent = new https.Agent({
-  lookup: (hostname, options, callback) => {
-    dns.lookup(hostname, { family: 4 }, callback);
-  },
-});
-
 // Service to fetch real-time stock price
 const fetchStockPrice = async (symbol) => {
   const ALPHA_API_KEY = process.env.ALPHA_VANTAGE_API_KEY;
   try {
     const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${ALPHA_API_KEY}`;
-    const response = await axios.get(url, { httpsAgent: ipv4Agent, timeout: 5000 });
+    const response = await axios.get(url);
     const price = response.data["Global Quote"]["05. price"];
     return parseFloat(price);
   } catch (error) {
@@ -58,9 +51,7 @@ exports.getExchangeRate = async (req, res) => {
         from_currency: "USD",
         to_currency: toCurrency,
         apikey: ALPHA_API_KEY,
-      },
-      httpsAgent: ipv4Agent,
-      timeout: 5000,
+      }
     });
     const rateData = response.data["Realtime Currency Exchange Rate"];
     if (!rateData || !rateData["5. Exchange Rate"]) {
@@ -99,9 +90,7 @@ exports.getAssets = async (req, res) => {
           from_currency: "USD",
           to_currency: userCurrency,
           apikey: ALPHA_API_KEY,
-        },
-        httpsAgent: ipv4Agent,
-        timeout: 5000,
+        }
       });
 
       const rateData = response.data["Realtime Currency Exchange Rate"];
@@ -223,7 +212,7 @@ exports.getStockPrice = async (req, res) => {
   const ALPHA_API_KEY = process.env.ALPHA_VANTAGE_API_KEY;
   try {
     const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${ticker}&apikey=${ALPHA_API_KEY}`;
-    const response = await axios.get(url, { httpsAgent: ipv4Agent, timeout: 5000 });
+    const response = await axios.get(url);
 
     const quote = response.data["Global Quote"];
 
