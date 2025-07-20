@@ -1,7 +1,7 @@
 const Asset = require("../models/Asset");
 const axios = require("axios");
-
-const ALPHA_API_KEY = process.env.ALPHA_VANTAGE_API_KEY;
+const https = require("https");
+const dns = require("dns");
 
 const currencySymbols = {
   USD: "$",
@@ -10,13 +10,19 @@ const currencySymbols = {
   GBP: "£",
 };
 
+// IPv4 agent to avoid IPv6 timeout issues
+const ipv4Agent = new https.Agent({
+  lookup: (hostname, options, callback) => {
+    dns.lookup(hostname, { family: 4 }, callback);
+  },
+});
+
 // Service to fetch real-time stock price
 const fetchStockPrice = async (symbol) => {
+  const ALPHA_API_KEY = process.env.ALPHA_VANTAGE_API_KEY;
   try {
-    console.log("Fetching stock price for:", symbol);
-    console.log("Using API Key:", ALPHA_API_KEY);
     const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${ALPHA_API_KEY}`;
-    const response = await axios.get(url);
+    const response = await axios.get(url, { httpsAgent: ipv4Agent, timeout: 5000 });
     const price = response.data["Global Quote"]["05. price"];
     return parseFloat(price);
   } catch (error) {
@@ -25,33 +31,52 @@ const fetchStockPrice = async (symbol) => {
   }
 };
 
-// Service to fetch exchange rate (USD → target)
-exports.getExchangeRate = async (toCurrency) => {
+/**
+ * @swagger
+ * /api/assets/exchange-rate/{currency}:
+ *   get:
+ *     summary: Get exchange rate from USD to a specified currency
+ *     tags: [Assets]
+ *     parameters:
+ *       - in: path
+ *         name: currency
+ *         required: true
+ *         schema:
+ *           type: string
+ *           enum: [USD, INR, EUR, GBP]
+ *     responses:
+ *       200:
+ *         description: Exchange rate retrieved
+ */
+exports.getExchangeRate = async (req, res) => {
+  const toCurrency = req.params.currency;
+  const ALPHA_API_KEY = process.env.ALPHA_VANTAGE_API_KEY;
   try {
-    const response = await axios.get("https://www.alphavantage.co/query", {
+    const response = await axios.get  ("https://www.alphavantage.co/query", {
       params: {
         function: "CURRENCY_EXCHANGE_RATE",
         from_currency: "USD",
         to_currency: toCurrency,
         apikey: ALPHA_API_KEY,
       },
+      httpsAgent: ipv4Agent,
+      timeout: 5000,
     });
-
     const rateData = response.data["Realtime Currency Exchange Rate"];
-    if (!rateData) throw new Error("No exchange data");
+    if (!rateData || !rateData["5. Exchange Rate"]) {
+      throw new Error("No exchange data");
+    }
 
-    return parseFloat(rateData["5. Exchange Rate"]);
+    res.json({
+      from: "USD",
+      to: toCurrency,
+      rate: parseFloat(rateData["5. Exchange Rate"]),
+    });
   } catch (err) {
-    throw new Error(`Exchange rate error: ${err.message}`);
+    console.error("Exchange rate error:", err.message);
+    res.status(500).json({ message: `Exchange rate error: ${err.message}` });
   }
 };
-
-/**
- * @swagger
- * tags:
- *   name: Stocks
- *   description: Asset management and stock price tracking
- */
 
 /**
  * @swagger
@@ -59,24 +84,30 @@ exports.getExchangeRate = async (toCurrency) => {
  *   get:
  *     summary: Get all assets for a user with optional currency conversion
  *     tags: [Stocks]
- *     parameters:
- *       - in: query
- *         name: currency
- *         schema:
- *           type: string
- *         description: Currency code (USD, INR, EUR, GBP)
- *     responses:
- *       200:
- *         description: List of user assets
  */
 exports.getAssets = async (req, res) => {
+  const ALPHA_API_KEY = process.env.ALPHA_VANTAGE_API_KEY;
   try {
     const userCurrency = req.query.currency || "USD";
     const assets = await Asset.find({ user: req.user._id });
 
     let exchangeRate = 1;
     if (userCurrency !== "USD") {
-      exchangeRate = await getExchangeRate(userCurrency);
+      const response = await axios.get("https://www.alphavantage.co/query", {
+        params: {
+          function: "CURRENCY_EXCHANGE_RATE",
+          from_currency: "USD",
+          to_currency: userCurrency,
+          apikey: ALPHA_API_KEY,
+        },
+        httpsAgent: ipv4Agent,
+        timeout: 5000,
+      });
+
+      const rateData = response.data["Realtime Currency Exchange Rate"];
+      if (!rateData || !rateData["5. Exchange Rate"]) throw new Error("No exchange data");
+
+      exchangeRate = parseFloat(rateData["5. Exchange Rate"]);
     }
 
     const enrichedAssets = assets.map((asset) => ({
@@ -99,15 +130,6 @@ exports.getAssets = async (req, res) => {
  *   get:
  *     summary: Get a single asset by ID
  *     tags: [Stocks]
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Asset object
  */
 exports.getAssetById = async (req, res) => {
   try {
@@ -125,26 +147,6 @@ exports.getAssetById = async (req, res) => {
  *   post:
  *     summary: Create a new asset with real-time stock price
  *     tags: [Stocks]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               name:
- *                 type: string
- *               ticker:
- *                 type: string
- *               quantity:
- *                 type: number
- *               buyPrice:
- *                 type: number
- *               assetType:
- *                 type: string
- *     responses:
- *       201:
- *         description: Asset created
  */
 exports.createAsset = async (req, res) => {
   try {
@@ -178,22 +180,6 @@ exports.createAsset = async (req, res) => {
  *   put:
  *     summary: Update an existing asset
  *     tags: [Stocks]
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             additionalProperties: true
- *     responses:
- *       200:
- *         description: Updated asset
  */
 exports.updateAsset = async (req, res) => {
   try {
@@ -214,15 +200,6 @@ exports.updateAsset = async (req, res) => {
  *   delete:
  *     summary: Delete an asset
  *     tags: [Stocks]
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Asset removed
  */
 exports.deleteAsset = async (req, res) => {
   try {
@@ -234,47 +211,20 @@ exports.deleteAsset = async (req, res) => {
   }
 };
 
-
 /**
  * @swagger
  * /api/asset/price/{ticker}:
  *   get:
  *     summary: Get current stock price for a ticker symbol
  *     tags: [Stocks]
- *     parameters:
- *       - in: path
- *         name: ticker
- *         required: true
- *         schema:
- *           type: string
- *         description: Stock ticker symbol (e.g., AAPL, TSLA)
- *     responses:
- *       200:
- *         description: Current stock price
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 symbol:
- *                   type: string
- *                 price:
- *                   type: number
- *                 volume:
- *                   type: number
- *                 change:
- *                   type: string
- *                 changePercent:
- *                   type: string
- *                 timestamp:
- *                   type: string
  */
 exports.getStockPrice = async (req, res) => {
   const { ticker } = req.params;
-
+  const ALPHA_API_KEY = process.env.ALPHA_VANTAGE_API_KEY;
   try {
     const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${ticker}&apikey=${ALPHA_API_KEY}`;
-    const response = await axios.get(url);
+    const response = await axios.get(url, { httpsAgent: ipv4Agent, timeout: 5000 });
+
     const quote = response.data["Global Quote"];
 
     if (!quote || !quote["05. price"]) {
