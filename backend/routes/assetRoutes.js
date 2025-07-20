@@ -6,6 +6,7 @@ const {
   updateAsset,
   deleteAsset,
   getStockPrice,
+  getExchangeRate
 } = require("../controllers/assetController");
 const { protect } = require("../middlewares/authMiddleware");
 
@@ -179,6 +180,45 @@ const router = express.Router();
  *       404:
  *         description: Asset not found
  */
+
+/**
+ * @swagger
+ * /api/assets/exchange-rate/{currency}:
+ *   get:
+ *     summary: Get exchange rate from USD to a specified currency
+ *     tags: [Assets]
+ *     parameters:
+ *       - in: path
+ *         name: currency
+ *         required: true
+ *         schema:
+ *           type: string
+ *           enum: [USD, INR, EUR, GBP]
+ *         description: The currency code to convert USD into
+ *     responses:
+ *       200:
+ *         description: Exchange rate retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 from:
+ *                   type: string
+ *                   example: USD
+ *                 to:
+ *                   type: string
+ *                   example: INR
+ *                 rate:
+ *                   type: number
+ *                   example: 83.21
+ *       400:
+ *         description: Invalid or unsupported currency
+ *       500:
+ *         description: Server error while fetching exchange rate
+ */
+router.get("/exchange-rate/:currency", getExchangeRate);
+
 
 router.route("/")
   .get(protect, getAssets)

@@ -5,6 +5,9 @@ const router = express.Router();
 
 /**
  * @swagger
+ * tags:
+ *   name: Auth
+ *   description: User authentication endpoints
  * components:
  *   securitySchemes:
  *     bearerAuth:

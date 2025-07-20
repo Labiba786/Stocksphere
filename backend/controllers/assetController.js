@@ -26,7 +26,7 @@ const fetchStockPrice = async (symbol) => {
 };
 
 // Service to fetch exchange rate (USD → target)
-const getExchangeRate = async (toCurrency) => {
+exports.getExchangeRate = async (toCurrency) => {
   try {
     const response = await axios.get("https://www.alphavantage.co/query", {
       params: {

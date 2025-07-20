@@ -21,7 +21,7 @@ exports.register = async (req, res) => {
       firstName: user.firstName,
       lastName: user.lastName,
       email: user.email,
-      token: generateToken(user._id),
+      status: "Registeration successful",
     });
   } catch (error) {
     res.status(500).json({ message: "Server Error" });
@@ -40,7 +40,7 @@ exports.login = async (req, res) => {
 
     const token = generateToken(user._id);
 
-    res.json({ token }); // Minimal response with just the JWT
+    res.json({ user, token }); // Minimal response with just the JWT
   } catch (error) {
     console.error("Login error:", error);
     res.status(500).json({ message: "Server Error" });
